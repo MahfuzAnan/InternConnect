@@ -2,7 +2,7 @@ import express from 'express';
 import fs from 'fs';
 import xlsx from 'xlsx';
 import otpgenerator from 'otp-generator';
-import Mailfunction from './mailsender.js';
+import Mailfunction from './mailsenders/mailsender.js';
 import bcrypt from 'bcrypt';
 import Student from '../models/student.model.js';
 import Company from '../models/company.model.js';
@@ -96,7 +96,7 @@ const ulpoadCompanydata = async (req, res)=>{
             {
               year: element.Year,
               address: element.Address,
-              requiredDomain: element.RequiredDomain.map((domain) => ({
+              requiredDomain: element.RequiredDomain.split(',').map((domain) => ({
                 domain,
                 internsNeeded: 0,
               })),
@@ -107,7 +107,9 @@ const ulpoadCompanydata = async (req, res)=>{
           minInterns: element.MinInterns,
           maxInterns: element.MaxInterns,
           status: element.Status,
-          
+          requiredDomain: element.RequiredDomain.split(',').map((domain) => ({
+            domain,
+          })),
         });
     
         await company.save();

@@ -2,12 +2,21 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import Checkbox from 'rc-checkbox';
 import 'rc-checkbox/assets/index.css';
+import { BASE_URL } from '../../services/helper.js';
+import toast from 'react-hot-toast';
+import 'react-toastify/dist/ReactToastify.css';
 
 const Companylist = () => {
   const [search, setSearch] = useState('');
   const [companies, setCompanies] = useState([]);
   const [filteredCompanies, setFilteredCompanies] = useState([]);
+  const [notAssessedstudentforcompany, setNotAssessedstudentforcompany] = useState(null)
+  const [isButtonClicked, setIsButtonClicked] = useState(false); 
+  
   const [editMode, setEditMode] = useState(false);
+  const [editRow, setEditRow] = useState(null);
+  const [buttonrow, setMailRow] = useState(null);
+
   const [companyData, setCompanyData] = useState({
     Title: '',
     Address: '',
@@ -16,14 +25,20 @@ const Companylist = () => {
     MaxInterns:' ',
     MinInterns:' ',
     InternsHired:' ',
-
-   
   });
+
   useEffect(() => {
-    axios.get('http://localhost:4000/InterConnect/company/companies')
+    axios.get(`${BASE_URL}/InterConnect/company/companies`)
       .then((response) => {
-        setCompanies(response.data.companies);
-        setFilteredCompanies(response.data.companies);
+        const companiesData = response.data;
+
+        if (!companiesData || companiesData.length === 0) {
+          console.log('No companies found.');
+          return;
+        }
+
+        setCompanies(companiesData);
+        setFilteredCompanies(companiesData);
         setCompanyData({
           
         })
@@ -34,6 +49,23 @@ const Companylist = () => {
   }, []);
 
   useEffect(() => {
+    try{
+      axios.get(`${BASE_URL}/InterConnect/company/getmentoredAssignedStudents`)
+      .then((response) => {
+        setNotAssessedstudentforcompany(response.data.notassignedstudent);
+        console.log(response.data.notassignedstudent);
+        
+      })
+      .catch((error) => {
+        console.error('An error occurred while fetching companies:', error);
+      });
+    } catch (error) {
+      console.error('An error occurred while updating company status:', error);
+    }
+    
+  }, [isButtonClicked]);
+
+  useEffect(() => {
     const filtered = companies.filter((company) => {
       const companyData = `${company.name} ${company.address} ${company.email} ${company.contactNumber}`.toLowerCase();
       return companyData.includes(search.toLowerCase());
@@ -42,32 +74,75 @@ const Companylist = () => {
     setFilteredCompanies(filtered);
   }, [search, companies]);
 
+
   const handleStatusUpdate = async (email, newStatus) => {
     try {
-      const response = await axios.put(`http://localhost:4000/InterConnect/company/updateCompanyStatus/${email}`, {
+      const response = await axios.put(`${BASE_URL}/InterConnect/company/updateCompanyStatus/${email}`, {
         status: newStatus
       });
 
       if (response.status === 200) {
-        console.error('Updated Status');
+        console.log('Updated Status');
       }
     } catch (error) {
       console.error('An error occurred while updating company status:', error);
     }
   };
 
-  const [editRow, setEditRow] = useState(null);
+  const handleAddMentor = async(index,company) => {
+    try {
+      const response = await axios.get(`${BASE_URL}/InterConnect/admin/sendFroms/${company._id}`);
+
+      if (response.status === 200) {
+        console.log('Mail Send');
+        toast.success('Mail Send')
+      }
+    } catch (error) {
+      console.error('An error occurred while updating company status:', error);
+    }
+    setMailRow(index);
+
+    setIsButtonClicked(true);
+    console.log(company)
+  };
 
   const handleEditClick = (index) => {
     setEditRow(index);
     setEditMode(true);
   };
 
-  const handleSaveClick = (index) => {
+  const handleSaveClick = async (index) => {
+    try {
+      const companyToUpdate = companies[index];
+      console.log('Updated Company Data:', companyToUpdate);
+
+      const response = await axios.put(`${BASE_URL}/InterConnect/company/updateCompany/${companyToUpdate.email}`, {
+        name: companyToUpdate.name,
+        email: companyToUpdate.email,
+        address: companyToUpdate.address,
+        contactNumber: companyToUpdate.contactNumber,
+        minInterns: companyToUpdate.minInterns,
+      });
+
+      if (response.status === 200) {
+        console.log('Company information updated successfully');
+        
+        toast.success('Company information updated successfully', { position: "top-right" });
+  
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('An error occurred while updating company information:', error);
+    }
+
+ 
     // Save the edited company data here, and then exit edit mode.
     setEditRow(null);
     setEditMode(false);
   };
+  
 
   return (
     <main className="table">
@@ -80,6 +155,7 @@ const Companylist = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+           <img src='search.png'></img>
         </div>
       </section>
 
@@ -94,13 +170,13 @@ const Companylist = () => {
               <th>Min Interns</th>
               <th>Status</th>
               <th>Action</th>
+              <th>Action</th>
             </tr>
           </thead>
 
           <tbody>
             {filteredCompanies.map((company, index) => (
               <tr key={index}>
-
 
                 <td>              
                   {editRow === index ? (
@@ -134,20 +210,8 @@ const Companylist = () => {
                     company.address
                   )}</td>
 
-                <td>
-                {editRow === index ? (
-                    <input
-                      type="email"
-                      value={company.email}
-                      onChange={(e) => {
-                        const updatedCompanies = [...companies];
-                        updatedCompanies[index].email = e.target.value;
-                        setCompanies(updatedCompanies);
-                      }}
-                    />
-                  ) : (
-                    company.email
-                  )}
+                <td>              
+                    {company.email}
                   </td>
 
 
@@ -197,8 +261,8 @@ const Companylist = () => {
                     }}
                   />
 
-
                 </td>
+
                 <td>
                   {editRow === index ? (
                     <div className="save">
@@ -212,6 +276,18 @@ const Companylist = () => {
                     </div>
                   )}
                 </td>
+                
+                <td>
+
+                  {buttonrow === index ? (
+                      <p>{'Form Sent'}</p>
+                    ) : (
+                      notAssessedstudentforcompany && notAssessedstudentforcompany[company._id]?.length > 0? (
+                        <div className="save">
+                      <button onClick={() => handleAddMentor(index,company)}>Add Mentor</button>
+                      </div>) : (<p>N/A</p>)           
+                    )}
+                  </td>
               </tr>
             ))}
           </tbody>

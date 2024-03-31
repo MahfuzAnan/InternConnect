@@ -1,27 +1,100 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Select from 'react-select';
+import axios from 'axios';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { BASE_URL } from "../../services/helper.js"
+
 
 const Sendcv = () => {
   const [showTable, setShowTable] = useState(false);
-  const [cvList, setCvList] = useState([
-    { name: 'Lomatul Mahzabin', studentId: '200042113', cv: '200042113_cv' },
-    { name: 'Lomatul Mahzabin', studentId: '200042113', cv: '200042113_cv' },
-    { name: 'Lomatul Mahzabin', studentId: '200042113', cv: '200042113_cv' },
-    { name: 'Lomatul Mahzabin', studentId: '200042113', cv: '200042113_cv' },
-    // Add more initial data if needed
-  ]);
+  const [cvList, setCvList] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [selectedCompany, setSelectedCompany] = useState([]);
+  const [sort,setSort]=useState([]);
+  const [number, setNumber]=useState('');
+  const [students, setStudents] = useState([]);
+
+  const [loading, setLoading] = useState(false);
 
   const [selectedStudent, setSelectedStudent] = useState(null);
 
-  const handleOkayButtonClick = () => {
-    setShowTable(!showTable);
+  const [mailContent, setMailContent] = useState('Hello,\n\nThis Mail is From InterConnect. Please find the CVs attached for this years internship.\n\n Please Reply us Within 1 Week');
+
+  const handleContentChange = (e) => {
+    setMailContent(e.target.value);
+  };
+
+
+  const handleOkayButtonClick = async(e) => {
+    e.preventDefault();
+    setShowTable(true);
+    console.log("company Id", selectedCompany)
+    try{
+      await axios.post(`${BASE_URL}/InterConnect/admin/getMatchedStudents`, {company:selectedCompany, number, type:sort})
+      .then((response)=>{
+        console.log("upcoming list", response.data.returnStudentId);
+        setCvList(response.data.returnStudentId);
+        if(response.data.returnStudentId?.length==0){
+          toast.warning('No optimal student matches found', { position: "top-right" });
+        }else{
+          toast.success('Student matches', { position: "top-right" });
+        }
+        
+
+    }).catch((error)=>{
+        if (error.response) {
+            toast.error('Error while getting matched student', { position: "top-right" });
+            console.log(error.response);
+            console.log("server responded");
+          } else if (error.request) {
+            console.log("network error");
+          } else {
+            console.log(error);
+          }
+    });
+    }catch(error){
+      console.log("An Error Occured", error);
+    }
+    
   };
 
 
   const sortingways=[  
-    {value:"Default", label:"Default"},
-    {value:"CGPA", label:"CGPA"}
+    {value:1, label:"Default"},
+    {value:2, label:"CGPA"}
 ]
+
+  useEffect(() => {
+    axios.get(`${BASE_URL}/InterConnect/company/companies`)
+      .then((response) => {
+        const hiringCompanies = response.data.filter((company) => company.status === 'Hiring');
+        setCompanies(hiringCompanies);
+        console.log(companies)
+        // setFilteredCompanies(hiringCompanies); // Initially, both arrays are the same
+      })
+      .catch((error) => {
+        console.error('An error occurred while fetching companies:', error);
+      });
+  }, []);
+
+  useEffect(() => {
+    axios.get(`${BASE_URL}/InterConnect/student/students`)
+      .then((response) => {
+        const allStudents = response.data;
+
+        if (!allStudents || allStudents.length === 0) {
+          console.log('No students found.');
+          return;
+        }
+
+        const filteredStudents = allStudents.filter((student) => student.accountActivationStatus && student.currentStatus == null && !cvList.includes(student.student_id));
+        setStudents(filteredStudents);
+      })
+      .catch((error) => {
+        console.error('An error occurred while fetching students:', error);
+      });
+  }, [cvList]);
 
   const handleRemoveRow = (index) => {
     const updatedCvList = [...cvList];
@@ -32,15 +105,40 @@ const Sendcv = () => {
   const handleAddButtonClick = () => {
     // Logic to add a new CV to the list with the selected student
     if (selectedStudent) {
-      const newCv = {
-        name: selectedStudent.name,
-        studentId: selectedStudent.studentId,
-        cv: `${selectedStudent.studentId}_cv`, // You may need to generate a unique CV identifier
-      };
+      const newCv = selectedStudent;
       setCvList([...cvList, newCv]);
       setSelectedStudent(null);
     }
   };
+
+  const handleSendButtonClick= async() =>{
+    setLoading(true);
+    try{
+      await axios.post(`${BASE_URL}/InterConnect/admin/sendcvtocompany`, {companyID:selectedCompany, students:cvList, text: mailContent,})
+      .then((response)=>{
+        console.log(response);
+        console.log("student", cvList);
+        toast.success('Cvs has been sent to the companies!')
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+    }).catch((error)=>{
+        if (error.response) {
+            toast.error('Error while getting matched student', { position: "top-right" });
+            console.log(error.response);
+            console.log("server responded");
+          } else if (error.request) {
+            console.log("network error");
+          } else {
+            console.log(error);
+          }
+    }).finally(() => {
+      setLoading(false); // Set loading to false regardless of success or failure
+    });
+    }catch(error){
+      console.log("An Error Occured", error);
+    }
+  }
 
   return (
     <div>
@@ -66,24 +164,29 @@ const Sendcv = () => {
                   <div className="sending-cvs">
                     <div className="form-group">
                             <label htmlFor=""> Number of CVs<span>*</span></label>
-                            <input type="number" min="0"/>
+                            <input type="number" min="1" value={number} onChange={(e)=>setNumber(e.target.value)}/>
                     </div>
 
                     <div className="form-group">
                         <label>Name of the Company:</label>
-                        <Select className='adselect' />        
+                        <Select className='adselect' options={companies.map((company)=>({
+                                  value:company._id,
+                                  label:company.name
+                            }))} onChange={(selectedOption) => setSelectedCompany(selectedOption.value)}/>        
                     </div>
                     
                     <div className="form-group">
                         <label>Sorting Method:</label>
-                        <Select className='adselect'  options={sortingways} />             
+                        <Select className='adselect'  options={sortingways} onChange={(selectedOption) => setSort(selectedOption.value)}/>             
                     </div>
-                
-          </div>
+                  </div>
+
+
           <button onClick={handleOkayButtonClick}>Okay</button>
           </div>
 
       <div className="cvSending">
+      {loading && <img src="loading.gif"alt="InternConnect Logo" />}
         {showTable && (
           <div className="companies">
             <main className="table">
@@ -97,19 +200,22 @@ const Sendcv = () => {
                       <th>Name</th>
                       <th>Student ID</th>
                       <th>CV</th>
-                      <th>Edit</th>
+                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {cvList.map((cv, index) => (
                       <tr key={index}>
                         <td>{cv.name}</td>
-                        <td>{cv.studentId}</td>
-                        <td>{cv.cv}</td>
+                        <td>{cv.student_id}</td>
+                        <td>{cv.CV}</td>
                         <td>
+                          <div className="rejected">
                           <button onClick={() => handleRemoveRow(index)}>
-                            Remove
+                          Remove
                           </button>
+                          </div>
+                          
                         </td>
                       </tr>
                     ))}
@@ -121,21 +227,34 @@ const Sendcv = () => {
               <div className="form-group">
                 <Select
                   className='adselect'
-                  value={selectedStudent}
-                  options={[
-                    { value: '1', label: 'Student 1', name: 'Student 1', studentId: '1' },
-                    { value: '2', label: 'Student 2', name: 'Student 2', studentId: '2' },
-                    // Add more students as needed
-                  ]}
-                  onChange={(selectedOption) => setSelectedStudent(selectedOption)}
+                  // value={selectedStudent?{ value: selectedStudent, label: selectedStudent.student_id }:null}
+                  options={students.map((student)=>({
+                      value:student,
+                      label:student.student_id
+                  }))}
+                  onChange={(selectedOption) => setSelectedStudent(selectedOption.value)}
                 />
                 </div>
                 <div className="table-button">
-                <button onClick={handleAddButtonClick}>Add</button>             
+                  <div className="hired">
+                  <button onClick={handleAddButtonClick}>Add</button> 
+                  </div>
+                            
                 </div>
+                
                 </div>
+                    <div className="form-group">
+                          <div className="mail-text" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                            <textarea 
+                              cols="30" rows="10"
+                              value={mailContent}
+                              onChange={handleContentChange}
+                              placeholder="Type your mail content here..."
+                            ></textarea>
+                          </div>
+                        </div>
                 <div className="form-button">
-                <button >Send</button>      
+                <button onClick={handleSendButtonClick}>Send</button>      
                 </div>
                       
             </main>

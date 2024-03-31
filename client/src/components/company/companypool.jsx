@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { BASE_URL } from '../../services/helper';
+
 
 const Companypool = () => {
   const [search, setSearch] = useState('');
@@ -7,9 +9,16 @@ const Companypool = () => {
   const [filteredCompanies, setFilteredCompanies] = useState([]);
 
   useEffect(() => {
-    axios.get('http://localhost:4000/InterConnect/company/companies')
+    axios.get(`${BASE_URL}/InterConnect/company/companies`)
       .then((response) => {
-        const hiringCompanies = response.data.companies.filter((company) => company.status === 'Hiring');
+        const allCompanies = response.data;
+
+        if (!allCompanies || allCompanies.length === 0) {
+          console.log('No companies found.');
+          return;
+        }
+
+      const hiringCompanies = allCompanies.filter((company) => company.status === 'Hiring');
         setCompanies(hiringCompanies);
         setFilteredCompanies(hiringCompanies); // Initially, both arrays are the same
       })
@@ -29,6 +38,7 @@ const Companypool = () => {
   }, [search, companies]);
 
   return (
+    
     <main className="table">
       <section className="table__header">
         <h1>Company Details </h1>
@@ -39,6 +49,7 @@ const Companypool = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+           <img src='search.png'></img>
         </div>
       </section>
       <section className="table__body">
@@ -49,7 +60,7 @@ const Companypool = () => {
               <th> Address </th>
               <th> Email </th>
               <th> Contact Number </th>
-              <th> Interns Hired </th>
+              <th> Min Interns </th>
             </tr>
           </thead>
           <tbody>

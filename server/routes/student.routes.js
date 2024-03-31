@@ -18,10 +18,17 @@ import {
   addProject,
   getProjectsByStudentId,
   editProject,
-  deleteProject
+  deleteProject,
+  updateCurrentStatus,
+  updateCurrentStatusByIdToHired,
+  updateCurrentStatusByIdToRejected,
+  uploadInternshipReportFile,
+  getStudentReportById,
+  ViewGrade
 } from '../controllers/student.controller.js';
 import Upload from '../middlewares/multer.Cv.js'; 
-
+import uploadInternshipReport from '../middlewares/multer.report.js';
+import {ensureAuthenticated} from '../middlewares/auth.middleware.js'
 
 const router = express.Router();
 
@@ -65,5 +72,20 @@ router.patch('/editProjects/:student_id/:project_id', editProject);
 
 router.delete('/deleteProjects/:student_id/:project_id', deleteProject);
 
+router.patch('/UpdateCurrentStatus', updateCurrentStatus);
+
+router.get('/updateCurrentStatusByIdToHired/:student_id', updateCurrentStatusByIdToHired);
+
+router.get('/updateCurrentStatusByIdToRejected/:student_id', updateCurrentStatusByIdToRejected);
+
+router.post('/updateCurrentStatusByIdToHired/:student_id', updateCurrentStatusByIdToHired);
+
+router.post('/updateCurrentStatusByIdToRejected/:student_id', updateCurrentStatusByIdToRejected);
+
+router.post('/uploadInternshipReport/:student_id', uploadInternshipReport.single('file'), uploadInternshipReportFile);
+
+router.get('/getStudentReport/:student_id', getStudentReportById);
+
+router.get('/ViewGrade', ensureAuthenticated, ViewGrade);
 
 export default router;

@@ -8,7 +8,7 @@ const sendCVsEmail = async (cvFileNames, recipientEmail) => {
     const transporter = nodemailer.createTransport({
       service: 'Gmail',
       auth: {
-        user: "internconnect.swe@gmail.com",
+        user: 'internconnect.swe@gmail.com',
         pass: process.env.mail_pass  
       },
     });
